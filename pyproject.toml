@@ -1,0 +1,47 @@
+# ============================================================
+# 自媒体口播脚本自动生成工厂 — 项目配置文件
+# 使用 uv/pip 安装: pip install -e .
+# ============================================================
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "script-factory"
+version = "0.1.0"
+description = "自媒体口播脚本自动生成工厂 — 多Agent协作流水线"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",            # Web 框架，提供 REST API
+    "uvicorn[standard]>=0.30.0",   # ASGI 服务器，运行 FastAPI 应用
+    "langchain>=0.3.0",            # LLM 应用开发框架，编排 Agent 流水线
+    "langchain-openai>=0.2.0",     # LangChain 的 OpenAI 兼容接口（对接 DeepSeek）
+    "langchain-community>=0.3.0",  # LangChain 社区集成（工具、检索器等）
+    "pydantic>=2.9.0",             # 数据验证与序列化，FastAPI 底层依赖
+    "python-dotenv>=1.0.0",        # 从 .env 文件加载环境变量
+    "tavily-python>=0.5.0",        # Tavily AI 搜索 API 客户端
+    "langfuse>=2.50.0",            # LLM 可观测性与追踪平台（层4启用）
+    "httpx>=0.27.0",               # 高性能 HTTP 客户端，用于外部 API 调用
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",                 # 测试框架
+    "pytest-asyncio>=0.24.0",      # pytest 的异步支持插件
+    "httpx>=0.27.0",               # 测试中用于 FastAPI TestClient
+]
+
+# setuptools 包发现配置：仅包含 backend 目录下的 Python 包
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
+# pytest 默认配置
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]      # 测试文件搜索路径
+pythonpath = ["."]                 # 将项目根目录加入 Python 路径
+asyncio_mode = "auto"              # 自动识别 async 测试函数
+markers = [
+    "asyncio: 标记异步测试用例",
+    "skipif: 条件跳过测试",
+]

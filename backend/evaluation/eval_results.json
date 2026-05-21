@@ -1,0 +1,310 @@
+{
+  "summary": {
+    "single_avg": 87.3,
+    "multi_avg": 88.33333333333333,
+    "improvement": 1.0333333333333314,
+    "multi_pass_rate": 1.0
+  },
+  "details": [
+    {
+      "topic": "打工人如何保持精力旺盛",
+      "style": "知识",
+      "single_score": 85,
+      "multi_score": 90.0,
+      "single_elapsed": 7.7362141609191895,
+      "multi_elapsed": 35.5840277671814,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "打工人如何保持精力旺盛",
+      "style": "搞笑",
+      "single_score": 86,
+      "multi_score": 92.0,
+      "single_elapsed": 7.959779500961304,
+      "multi_elapsed": 78.54845023155212,
+      "revisions": 3,
+      "grade": "normal"
+    },
+    {
+      "topic": "打工人如何保持精力旺盛",
+      "style": "情感",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 6.3000078201293945,
+      "multi_elapsed": 32.124258041381836,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "月薪三千如何理财",
+      "style": "知识",
+      "single_score": 90,
+      "multi_score": 92.0,
+      "single_elapsed": 6.61121392250061,
+      "multi_elapsed": 95.0749671459198,
+      "revisions": 3,
+      "grade": "degraded"
+    },
+    {
+      "topic": "月薪三千如何理财",
+      "style": "搞笑",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 9.039750337600708,
+      "multi_elapsed": 42.66510248184204,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "月薪三千如何理财",
+      "style": "情感",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 6.6319005489349365,
+      "multi_elapsed": 71.87264966964722,
+      "revisions": 3,
+      "grade": "degraded"
+    },
+    {
+      "topic": "第一次租房遇到的坑",
+      "style": "知识",
+      "single_score": 95,
+      "multi_score": 89.0,
+      "single_elapsed": 7.917347192764282,
+      "multi_elapsed": 80.19145131111145,
+      "revisions": 3,
+      "grade": "degraded"
+    },
+    {
+      "topic": "第一次租房遇到的坑",
+      "style": "搞笑",
+      "single_score": 85,
+      "multi_score": 95.0,
+      "single_elapsed": 8.177408933639526,
+      "multi_elapsed": 47.84829568862915,
+      "revisions": 2,
+      "grade": "normal"
+    },
+    {
+      "topic": "第一次租房遇到的坑",
+      "style": "情感",
+      "single_score": 85,
+      "multi_score": 90.0,
+      "single_elapsed": 6.911361932754517,
+      "multi_elapsed": 48.892975091934204,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "同事借钱不还怎么办",
+      "style": "知识",
+      "single_score": 85,
+      "multi_score": 87.0,
+      "single_elapsed": 5.427665710449219,
+      "multi_elapsed": 36.86707925796509,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "同事借钱不还怎么办",
+      "style": "搞笑",
+      "single_score": 95,
+      "multi_score": 91.0,
+      "single_elapsed": 7.871206283569336,
+      "multi_elapsed": 35.568877935409546,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "同事借钱不还怎么办",
+      "style": "情感",
+      "single_score": 93,
+      "multi_score": 85.0,
+      "single_elapsed": 6.76272439956665,
+      "multi_elapsed": 51.38840579986572,
+      "revisions": 3,
+      "grade": "normal"
+    },
+    {
+      "topic": "为什么你总是减肥失败",
+      "style": "知识",
+      "single_score": 92,
+      "multi_score": 89.0,
+      "single_elapsed": 8.104342937469482,
+      "multi_elapsed": 43.69733667373657,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "为什么你总是减肥失败",
+      "style": "搞笑",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 9.75354290008545,
+      "multi_elapsed": 24.183135509490967,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "为什么你总是减肥失败",
+      "style": "情感",
+      "single_score": 88,
+      "multi_score": 93.0,
+      "single_elapsed": 6.34295916557312,
+      "multi_elapsed": 43.189894676208496,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "00后整顿职场是真的吗",
+      "style": "知识",
+      "single_score": 85,
+      "multi_score": 90.0,
+      "single_elapsed": 6.001908540725708,
+      "multi_elapsed": 23.562180042266846,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "00后整顿职场是真的吗",
+      "style": "搞笑",
+      "single_score": 85,
+      "multi_score": 92.0,
+      "single_elapsed": 8.199712991714478,
+      "multi_elapsed": 47.87675666809082,
+      "revisions": 3,
+      "grade": "degraded"
+    },
+    {
+      "topic": "00后整顿职场是真的吗",
+      "style": "情感",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 7.6506571769714355,
+      "multi_elapsed": 27.04892373085022,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "短视频算法是怎么控制你的",
+      "style": "知识",
+      "single_score": 85,
+      "multi_score": 92.0,
+      "single_elapsed": 6.9379003047943115,
+      "multi_elapsed": 45.15607738494873,
+      "revisions": 3,
+      "grade": "degraded"
+    },
+    {
+      "topic": "短视频算法是怎么控制你的",
+      "style": "搞笑",
+      "single_score": 85,
+      "multi_score": 92.0,
+      "single_elapsed": 9.257359981536865,
+      "multi_elapsed": 77.08512234687805,
+      "revisions": 3,
+      "grade": "normal"
+    },
+    {
+      "topic": "短视频算法是怎么控制你的",
+      "style": "情感",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 6.9072089195251465,
+      "multi_elapsed": 20.826172590255737,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "谈恋爱要不要AA制",
+      "style": "知识",
+      "single_score": 88,
+      "multi_score": 85.0,
+      "single_elapsed": 6.7703773975372314,
+      "multi_elapsed": 25.554043531417847,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "谈恋爱要不要AA制",
+      "style": "搞笑",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 7.5735859870910645,
+      "multi_elapsed": 44.27270817756653,
+      "revisions": 1,
+      "grade": "normal"
+    },
+    {
+      "topic": "谈恋爱要不要AA制",
+      "style": "情感",
+      "single_score": 85,
+      "multi_score": 92.0,
+      "single_elapsed": 8.02754259109497,
+      "multi_elapsed": 40.969199657440186,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "如何拒绝加班又不被辞退",
+      "style": "知识",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 7.172498941421509,
+      "multi_elapsed": 59.486549377441406,
+      "revisions": 3,
+      "grade": "normal"
+    },
+    {
+      "topic": "如何拒绝加班又不被辞退",
+      "style": "搞笑",
+      "single_score": 95,
+      "multi_score": 89.0,
+      "single_elapsed": 10.903987646102905,
+      "multi_elapsed": 28.0530104637146,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "如何拒绝加班又不被辞退",
+      "style": "情感",
+      "single_score": 89,
+      "multi_score": 85.0,
+      "single_elapsed": 6.895515441894531,
+      "multi_elapsed": 98.13292837142944,
+      "revisions": 3,
+      "grade": "degraded"
+    },
+    {
+      "topic": "AI会取代你的工作吗",
+      "style": "知识",
+      "single_score": 85,
+      "multi_score": 85.0,
+      "single_elapsed": 8.344215154647827,
+      "multi_elapsed": 27.69227385520935,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "AI会取代你的工作吗",
+      "style": "搞笑",
+      "single_score": 89,
+      "multi_score": 85.0,
+      "single_elapsed": 7.792985439300537,
+      "multi_elapsed": 30.349969625473022,
+      "revisions": 0,
+      "grade": "normal"
+    },
+    {
+      "topic": "AI会取代你的工作吗",
+      "style": "情感",
+      "single_score": 89,
+      "multi_score": 90.0,
+      "single_elapsed": 7.552551746368408,
+      "multi_elapsed": 25.83149528503418,
+      "revisions": 0,
+      "grade": "normal"
+    }
+  ]
+}
