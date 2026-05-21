@@ -1,116 +1,187 @@
 # 自媒体口播脚本自动生成工厂
 
-多Agent协作流水线：策划→写作→审核→修改，自动生成短视频口播脚本。
+多 Agent 协作流水线，输入选题 + 风格 + 时长，自动输出带节奏标记的口播脚本。面向 MCN 机构场景：策划→写作→审核→修改，全自动闭环。
 
-## 技术栈
+## 项目亮点
 
-| 层 | 技术 |
-|----|------|
-| 后端 | FastAPI + LangChain + DeepSeek + Pydantic |
-| 前端 | Vue 3 + Vite (Swiss Modernism 2.0) |
-| 搜索 | Tavily Search API |
-| 编排 | 自定义状态机 (while + dict) |
-| 可观测 | LangFuse |
-| 部署 | Docker Compose |
+- **多 Agent 协作** — 4 个 Agent 各司其职（策划/写作/审核/修改），审核不通过自动循环修改，最多 3 轮
+- **自研状态机替代 LangGraph** — 评估后认定线性流程不需要图编排，50 行 `while + dict` 搞定，少引入 15 个依赖
+- **双护栏机制** — 正则硬拦截（极限词/医疗断言/政治敏感 100% 命中率）+ LLM 语义审查，两条路径互补
+- **全栈可运行** — FastAPI + Vue 3，前端实时展示流水线进度，节奏标记彩色高亮
+- **可观测** — LangFuse 全链路追踪，每个 Agent 的耗时和 token 消耗实时可见
+
+## 评估数据
+
+30 个样本（10 选题 × 3 风格），单 Agent vs 多 Agent 盲评对比：
+
+| | 单 Agent | 多 Agent | 提升 |
+|------|---------|---------|------|
+| 总平均分 | 87.3 | 88.3 | +1.0 |
+| 知识风格 | 87.5 | 88.4 | +0.9 |
+| 搞笑风格 | 87.5 | 89.1 | **+1.6** |
+| 情感风格 | 86.9 | 87.5 | +0.6 |
+| 通过率 | — | **100%** | — |
+
+多 Agent 在搞笑风格上提升最显著（+1.6 分），审核→修改循环对幽默内容的合规拦截和节奏优化效果明显。
 
 ## 架构
 
 ```
-用户输入(选题+风格+时长)
-    │
-    ▼
-策划Agent (deepseek-reasoner + Tavily搜索)
-    │
-    ▼
-[人工确认点]  ← 可选暂停，审阅大纲
-    │
-    ▼
-写作Agent (deepseek-chat)
-    │
-    ▼
-审核Agent (deepseek-reasoner) ──┬── 通过 → 输出
-                                │
-                                ├── 不通过 → 修改Agent
-                                │         │
-                                └── 3轮超限 → 降级输出
+POST /generate
+      │
+      ▼
+┌──────────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│ 策划 Agent    │ ──▶ │ 写作 Agent │ ──▶ │ 审核 Agent │ ──▶ │ 修改 Agent │
+│ reasoner+Tavily│     │ chat+风格  │     │ reasoner   │     │ chat      │
+└──────────────┘     └──────────┘     └──────────┘     └──────────┘
+      │                    │                │                 │
+      │              ┌─────┴─────┐    ┌────┴────┐     ┌─────┴──────┐
+      ▼              │ 护栏①     │    │ 护栏③  │     │ 护栏②     │
+  大纲+标题+金句     │ 正则检测  │    │ 合并    │     │ 正则检测   │
+                     └───────────┘    └─────────┘     └────────────┘
+                                                         │
+                                              ┌──────────┴──────────┐
+                                              │ 通过/no P0P1 → done │
+                                              │ 不通过 → 修改(≤3轮) │
+                                              │ 超限 → 降级+人工    │
+                                              └─────────────────────┘
 ```
+
+**HTTP 一次推一步**：前后端通过 state dict 在请求/响应间传递流水线状态。前端 `autoContinue()` 自动接力，直到 `done`。用户看到每一步实时进度，而不是等 60 秒才出结果。
+
+## 技术栈
+
+| 层 | 选型 | 说明 |
+|------|------|------|
+| 后端框架 | FastAPI | 异步支持，自带 OpenAPI 文档 |
+| LLM 调用 | LangChain + DeepSeek | OpenAI 兼容协议，reasoner 用于分析、chat 用于生成 |
+| 数据校验 | Pydantic v2 | Agent 间消息格式、API 请求/响应 |
+| 前端 | Vue 3 + Vite | Composition API，CSS Grid 12 列响应式 |
+| 搜索 | Tavily API | 策划时搜热点，审核时事实核查 |
+| 可观测 | LangFuse | Agent 级耗时/token 追踪（无 Key 时退化为终端日志） |
+| 编排 | 自定义状态机 | `while + dict`，不用 LangGraph |
+| 部署 | Docker Compose | 单容器，API + 4 Agent 同进程 |
 
 ## 快速开始
 
-### 1. 环境准备
+### 1. 环境
 
 ```bash
-# Python 3.12+
+# Python 3.12+, Node 18+
 python -m venv .venv
 .venv\Scripts\activate
 pip install -e .
-
-# Node 18+
 npm --prefix frontend install
 ```
 
-### 2. 配置API Key
+### 2. 配置
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填入 DeepSeek API Key 和 Tavily API Key
+```
+
+编辑 `.env`，必填 `DEEPSEEK_API_KEY`，Tavily 和 LangFuse 可选（不填自动降级）：
+
+```env
+DEEPSEEK_API_KEY=sk-xxx
+DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+TAVILY_API_KEY=tvly-xxx          # 可选
+LANGFUSE_PUBLIC_KEY=pk-lf-xxx    # 可选
 ```
 
 ### 3. 启动
 
 ```bash
-# 后端
+# 后端（端口 8000）
 uvicorn backend.app.main:app --reload
 
-# 前端（另一个终端）
+# 前端（端口 5173，Vite proxy → 8000）
 npm --prefix frontend run dev
 ```
 
-浏览器打开 http://localhost:5173
+浏览器打开 `http://localhost:5173`，填选题 → 选风格 → 点生成。
 
-### 4. Docker 部署
+### 4. Docker
 
 ```bash
 docker-compose -f docker/docker-compose.yml up -d
 ```
 
-## 项目结构
+## 测试
 
+```bash
+# 全量测试（97 个，无需 API Key 的纯逻辑测试可脱机跑）
+pytest backend/tests/ -v
+
+# E2E 测试（需要真实 API Key）
+pytest backend/tests/test_e2e.py -v -s
+
+# 评估对比（需要 API Key，30 样本约 30 分钟）
+python backend/evaluation/run_eval.py
 ```
-├── backend/              # 后端
-│   ├── app/              # 应用代码
-│   │   ├── agents/       # 4个Agent (策划/写作/审核/修改)
-│   │   ├── api/          # API路由 + 依赖注入
-│   │   ├── core/         # 全局配置
-│   │   ├── schemas/      # Pydantic数据模型
-│   │   ├── pipeline/     # 编排器状态机
-│   │   ├── guardrails/   # 合规护栏
-│   │   └── tracker/      # LangFuse可观测
-│   ├── tests/            # 测试
-│   └── evaluation/       # 评估数据集+对比脚本
-├── frontend/             # 前端 Vue 3 + Vite
-│   └── src/
-│       ├── api/          # API调用封装
-│       └── components/   # UI组件
-├── docker/               # Docker部署
-└── docs/                 # 设计文档+实施计划
-```
+
+| 文件 | 数量 | 内容 |
+|------|------|------|
+| `test_pipeline.py` | 27 | 编排器状态机、步骤流转、兜底逻辑 |
+| `test_compliance.py` | 34 | 极限词/医疗断言/政治敏感/格式校验 |
+| `test_agents.py` | 21 | 4 个 Agent mock 测试、兜底、搜索调用 |
+| `test_extract_json.py` | 12 | JSON 解析：代码块/嵌套/异常 |
+| `test_e2e.py` | 3 | 端到端：health/422/完整流水线 |
 
 ## API
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | /generate | 生成脚本（首次/确认两种调用方式） |
-| GET | /health | 健康检查 |
+| POST | `/generate` | 首次调用传 topic/style/duration；后续传 confirm_action + state |
+| GET | `/health` | `{"status": "ok"}` |
 
-## 工作流模式
+### 请求示例
 
-- **全自动模式**: 一次调用 `/generate` → 策划→写作→审核→(修改)×N → 输出终稿
-- **人工确认模式**: 首次调用 → 策划完成暂停 → 审阅大纲 → 二次调用确认/重策划/修改大纲 → 继续执行
+**首次调用（全自动模式）**：
+```json
+{
+  "topic": "打工人如何保持精力",
+  "style": "知识",
+  "duration": 120,
+  "auto_mode": true
+}
+```
 
-## 核心指标
+**确认调用（人工确认模式，策划完成后）**：
+```json
+{
+  "confirm_action": "continue",
+  "feedback": "",
+  "state": { /* 上次响应返回的 state */ }
+}
+```
 
-- 自动审核一次通过率 ≥ 60%
-- 多Agent可用率 > 单Agent可用率
-- 合规检查拦截率 = 100%（极限词一个不漏）
-- 完整流水线耗时 < 60s
+## 关键设计决策
+
+**为什么不用 LangGraph？** 流水线是纯线性的（唯一分支是 auto_mode 开关和审核结果判断）。没有并行节点、不需要 checkpoint、不需要流式输出。`while + dict` 够用，LangGraph 会多 15+ 依赖和复杂图配置。
+
+**为什么不用 LangChain 模板？** LangChain 的 f-string 模板解析器对 `{}` 做二次解析，与 Python f-string 冲突（`Invalid format specifier`）。所有 Agent 直接用 `SystemMessage(content=f"...")` 拼 prompt。
+
+**为什么不用 PydanticOutputParser？** DeepSeek 上不稳定，有时不填内容而是回吐 JSON Schema 本身。改为 prompt 里写单行 JSON 示例 + `extract_json()` 手动解析。
+
+**为什么搜索失败不抛异常？** Tavily 搜索是辅助功能（热点搜集、事实核查），失败时返回空字符串不阻塞主流程。刻意设计的降级策略。
+
+**为什么前后端通过 dict 传状态？** HTTP 本身无状态，但流水线有状态。每个请求在后端恢复 state → 执行一步 → 序列化干净 state 返回前端。前端下次请求原样传回。简单直接，不需要 Redis/Session。
+
+## 项目结构
+
+```
+├── backend/app/
+│   ├── agents/          # 4 个 Agent（planning/writing/review/revision）
+│   ├── api/             # router.py + deps.py
+│   ├── core/            # config.py（Settings 单例）
+│   ├── schemas/         # Pydantic 模型（agent/request/response）
+│   ├── pipeline/        # orchestrator.py（状态机核心）
+│   ├── guardrails/      # compliance.py（正则护栏）
+│   └── tracker/         # langfuse.py（可观测）
+├── backend/tests/       # 97 个测试
+├── backend/evaluation/  # 评估数据集 + 对比脚本
+├── frontend/src/        # Vue 3 组件 + API 封装
+├── docker/              # Dockerfile + compose
+└── docs/                # 设计文档 + 实施计划
+```
