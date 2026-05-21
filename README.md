@@ -1,5 +1,7 @@
 # 自媒体口播脚本自动生成工厂
 
+[![Tests](https://github.com/Jackson-da/script-factory/actions/workflows/test.yml/badge.svg)](https://github.com/Jackson-da/script-factory/actions/workflows/test.yml)
+
 多 Agent 协作流水线，输入选题 + 风格 + 时长，自动输出带节奏标记的口播脚本。面向 MCN 机构场景：策划→写作→审核→修改，全自动闭环。
 
 ## 项目亮点
