@@ -8,7 +8,7 @@
 - **自研状态机替代 LangGraph** — 评估后认定线性流程不需要图编排，50 行 `while + dict` 搞定，少引入 15 个依赖
 - **双护栏机制** — 正则硬拦截（极限词/医疗断言/政治敏感 100% 命中率）+ LLM 语义审查，两条路径互补
 - **全栈可运行** — FastAPI + Vue 3，前端实时展示流水线进度，节奏标记彩色高亮
-- **可观测** — LangFuse 全链路追踪，每个 Agent 的耗时和 token 消耗实时可见
+- **可观测** — LangFuse 全链路追踪 + logging 日志系统（控制台+文件双输出，按天轮转），16 处日志点全覆盖
 
 ## 评估数据
 
@@ -58,7 +58,8 @@ POST /generate
 | 数据校验 | Pydantic v2 | Agent 间消息格式、API 请求/响应 |
 | 前端 | Vue 3 + Vite | Composition API，CSS Grid 12 列响应式 |
 | 搜索 | Tavily API | 策划时搜热点，审核时事实核查 |
-| 可观测 | LangFuse | Agent 级耗时/token 追踪（无 Key 时退化为终端日志） |
+| 日志 | logging | 控制台(INFO+) + 文件(DEBUG+, 按天轮转保留7天)，`LOG_LEVEL` 环境变量控制 |
+| 可观测 | LangFuse | Agent 级耗时/token 追踪（无 Key 时退化为 logging 输出） |
 | 编排 | 自定义状态机 | `while + dict`，不用 LangGraph |
 | 部署 | Docker Compose | 单容器，API + 4 Agent 同进程 |
 
@@ -87,6 +88,7 @@ DEEPSEEK_API_KEY=sk-xxx
 DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 TAVILY_API_KEY=tvly-xxx          # 可选
 LANGFUSE_PUBLIC_KEY=pk-lf-xxx    # 可选
+LOG_LEVEL=INFO                   # 可选：DEBUG|INFO|WARNING|ERROR
 ```
 
 ### 3. 启动
@@ -100,6 +102,8 @@ npm --prefix frontend run dev
 ```
 
 浏览器打开 `http://localhost:5173`，填选题 → 选风格 → 点生成。
+
+**日志**：控制台显示 INFO 级别及以上，文件 `logs/app.log` 留存完整 DEBUG 记录。排查问题时设 `LOG_LEVEL=DEBUG` 查看完整调用链。
 
 ### 4. Docker
 
@@ -174,7 +178,7 @@ python backend/evaluation/run_eval.py
 ├── backend/app/
 │   ├── agents/          # 4 个 Agent（planning/writing/review/revision）
 │   ├── api/             # router.py + deps.py
-│   ├── core/            # config.py（Settings 单例）
+│   ├── core/            # config.py（Settings）+ logging.py（日志系统）
 │   ├── schemas/         # Pydantic 模型（agent/request/response）
 │   ├── pipeline/        # orchestrator.py（状态机核心）
 │   ├── guardrails/      # compliance.py（正则护栏）
