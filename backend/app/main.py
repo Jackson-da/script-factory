@@ -20,20 +20,39 @@ FastAPI 应用入口 —— 整个后端的启动点。
     └── core/config.py (配置层：从 .env 读取 API key 等)
 """
 
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.router import router
+from backend.app.core.logging import setup_logging
+from backend.app.core.config import get_settings
 from backend.app.tracker.langfuse import flush as langfuse_flush
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理。启动时无操作，关闭时刷新 LangFuse 缓冲区。"""
+    """应用生命周期管理。启动时初始化日志，关闭时刷新 LangFuse 缓冲区。"""
+    # ---- 启动阶段 ----
+    setup_logging()
+    settings = get_settings()
+    langfuse_on = bool(
+        settings.langfuse_public_key
+        and settings.langfuse_secret_key
+        and "xxx" not in settings.langfuse_public_key
+        and "xxx" not in settings.langfuse_secret_key
+    )
+    logger.info(f"脚本工厂启动 | LangFuse={'启用' if langfuse_on else '未启用'} | LOG_LEVEL={os.getenv('LOG_LEVEL', 'INFO')}")
     yield
+    # ---- 关闭阶段 ----
+    logger.info("脚本工厂关闭中...")
     langfuse_flush()
+    logger.info("脚本工厂已关闭")
 
 # ============================================================
 # 1. 创建 FastAPI 应用实例

@@ -16,11 +16,14 @@
   有 P0/P1    → passed=false → 进入 revise 修改步骤
 """
 
+import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.app.agents.base import BaseAgent
 from backend.app.schemas.agent import ReviewResult, Issue
 from backend.app.core.config import get_settings
 from backend.app.tracker.langfuse import trace_agent
+
+logger = logging.getLogger(__name__)
 
 
 class ReviewAgent(BaseAgent):
@@ -57,8 +60,13 @@ class ReviewAgent(BaseAgent):
                 max_results=2,
             )
             summaries = [r.get("content", "")[:200] for r in result.get("results", [])]
+            if summaries:
+                logger.debug(f"Tavily 事实核查成功 | 结果数={len(summaries)}")
+            else:
+                logger.debug("Tavily 事实核查无结果")
             return "\n".join(summaries) if summaries else ""
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Tavily 事实核查失败（降级跳过）| error={e}")
             return ""
 
     @trace_agent("review")

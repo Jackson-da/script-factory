@@ -16,11 +16,14 @@ Tavily 搜索：
   搜索失败不阻塞主流程 —— 没有热点信息照样能生成大纲。
 """
 
+import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 from backend.app.agents.base import BaseAgent
 from backend.app.schemas.agent import Outline, Section
 from backend.app.core.config import get_settings
 from backend.app.tracker.langfuse import trace_agent
+
+logger = logging.getLogger(__name__)
 
 
 class PlanningAgent(BaseAgent):
@@ -57,8 +60,13 @@ class PlanningAgent(BaseAgent):
                 max_results=3,
             )
             summaries = [r.get("content", "")[:300] for r in result.get("results", [])]
+            if summaries:
+                logger.debug(f"Tavily 搜索成功 | query={topic} | 结果数={len(summaries)}")
+            else:
+                logger.debug(f"Tavily 搜索无结果 | query={topic}")
             return "\n".join(summaries) if summaries else ""
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Tavily 搜索失败（降级跳过）| query={topic} | error={e}")
             return ""   # 搜索失败不阻塞，继续正常的策划流程
 
     @trace_agent("planning")

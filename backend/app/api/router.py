@@ -26,12 +26,15 @@ POST /generate 设计要点：
     这就是 "REST API 驱动有状态流水线" 的标准做法。
 """
 
+import logging
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import ValidationError
 from backend.app.schemas.request import GenerateRequest, ConfirmRequest
 from backend.app.schemas.response import GenerateResponse, StepInfo
 from backend.app.api.deps import get_pipeline
 from backend.app.pipeline.orchestator import init_state
+
+logger = logging.getLogger(__name__)
 
 # APIRouter 是 FastAPI 的"子应用"。
 # 可以理解为"路由器"：它管理一组相关的端点。
@@ -133,7 +136,9 @@ async def generate_script(
             req = GenerateRequest(**body)
         except ValidationError as e:
             # 参数不符合要求 → 422 Unprocessable Entity
+            logger.warning(f"首次调用参数校验失败: {e}")
             raise HTTPException(status_code=422, detail=f"参数校验失败: {e}")
+        logger.info(f"首次调用 | topic={req.topic} | style={req.style} | duration={req.duration}s | auto={req.auto_mode}")
 
         # 题目不能是纯空格
         if not req.topic.strip():
@@ -154,6 +159,7 @@ async def generate_script(
         try:
             confirm = ConfirmRequest(**body)
         except ValidationError as e:
+            logger.warning(f"确认调用参数校验失败: {e}")
             raise HTTPException(status_code=422, detail=f"参数校验失败: {e}")
 
         # 从请求中恢复上次的 state
@@ -161,13 +167,16 @@ async def generate_script(
         # 把确认动作和反馈写回 state，流水线下一步会用
         state["confirm_action"] = confirm.confirm_action
         state["feedback"] = confirm.feedback
+        logger.info(f"确认调用 | action={confirm.confirm_action} | step={state.get('step', '?')}")
 
         # 如果已经是完成状态，不再执行，直接返回
         if state.get("step") == "done":
+            logger.info("流水线已完成，直接返回")
             return _state_to_response(state)
 
     # ---------- 都不是 → 422 ----------
     else:
+        logger.warning("请求体既无 topic 也无 confirm_action")
         raise HTTPException(
             status_code=422,
             detail="请传入 topic（首次生成）或 confirm_action+state（确认操作）"
@@ -178,5 +187,14 @@ async def generate_script(
     # 它读到 state["step"]，执行对应的 Agent，推进一步，break 返回。
     # 返回值是更新后的 state（step 已指向下一步）。
     state = pipeline(state)
+
+    # 记录流水线执行结果
+    elapsed = state.get("_elapsed", 0)
+    grade = state.get("grade", "normal")
+    revision_count = state.get("revision_count", 0)
+    logger.info(
+        f"流水线执行完毕 | step={state.get('step', '?')} | grade={grade} | "
+        f"revisions={revision_count} | elapsed={elapsed:.1f}s"
+    )
 
     return _state_to_response(state)

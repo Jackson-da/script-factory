@@ -1,11 +1,14 @@
 """
 LangFuse 可观测追踪。
-记录每个Agent的耗时，有 Key 时上报 LangFuse Dashboard，没有时退化为终端 print。
+记录每个Agent的耗时，有 Key 时上报 LangFuse Dashboard，没有时退化为 logging 输出。
 """
 
+import logging
 import time
 import functools
 from backend.app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 # 模块级开关：有 LangFuse key 才尝试启用
@@ -66,12 +69,12 @@ def trace_agent(agent_name: str):
                 result = func(self, state)
                 elapsed = time.time() - t0
 
-                # 终端日志（始终生效）
+                # 日志输出（始终生效）
                 tokens = state.get("_last_tokens", {})
                 if tokens:
-                    print(f"[Agent] {agent_name} | {elapsed:.1f}s | {tokens.get('input_tokens', 0)}+{tokens.get('output_tokens', 0)}={tokens.get('total_tokens', 0)} tokens | rev={state.get('revision_count', 0)}")
+                    logger.info(f"[Agent] {agent_name} | {elapsed:.1f}s | {tokens.get('input_tokens', 0)}+{tokens.get('output_tokens', 0)}={tokens.get('total_tokens', 0)} tokens | rev={state.get('revision_count', 0)}")
                 else:
-                    print(f"[Agent] {agent_name} | {elapsed:.1f}s | rev={state.get('revision_count', 0)}")
+                    logger.info(f"[Agent] {agent_name} | {elapsed:.1f}s | rev={state.get('revision_count', 0)}")
 
                 # LangFuse span 更新 + 关闭
                 if span is not None:
@@ -92,7 +95,7 @@ def trace_agent(agent_name: str):
 
             except Exception as e:
                 elapsed = time.time() - t0
-                print(f"[Agent] {agent_name} | {elapsed:.1f}s | ERROR: {e}")
+                logger.error(f"[Agent] {agent_name} | {elapsed:.1f}s | ERROR: {e}")
                 if span is not None:
                     try:
                         span.update(metadata={"error": str(e), "elapsed": elapsed})

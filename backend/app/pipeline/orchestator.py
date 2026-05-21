@@ -29,12 +29,15 @@ state dict 是什么？
   }
 """
 
+import logging
 import time
 from backend.app.agents.planning import PlanningAgent
 from backend.app.agents.writing import WritingAgent
 from backend.app.agents.review import ReviewAgent
 from backend.app.agents.revision import RevisionAgent
 from backend.app.guardrails.compliance import run_compliance_check
+
+logger = logging.getLogger(__name__)
 
 # 最大修改轮次 —— 超过此值即使有未解决问题也降级输出，避免死循环
 MAX_REVISIONS = 3
@@ -193,8 +196,12 @@ def run_pipeline(state: dict) -> dict:
             script_content = state.get("script", {}).get("content", "")
             if script_content:
                 compliance_result = run_compliance_check(script_content)
-                state["_compliance_issues"] = compliance_result.get("issues", [])
+                issues_found = compliance_result.get("issues", [])
+                state["_compliance_issues"] = issues_found
+                if issues_found:
+                    logger.warning(f"护栏① 写作后合规检测命中 {len(issues_found)} 条")
             state["step"] = "review"
+            logger.info(f"step: write → review")
             break   # 暂停，让前端展示进度
 
         # ======== 审核步骤：四维打分 + 问题分级 ========
@@ -213,6 +220,7 @@ def run_pipeline(state: dict) -> dict:
                 # 有合规命中时更新 passed 状态
                 review["passed"] = False
                 state["review"] = review
+                logger.warning(f"护栏③ 审核阶段合并合规问题 {len(compliance_issues)} 条")
 
             # 分离 P0/P1（必须改）和 P2（仅记录）
             must_fix = [i for i in issues if i.get("severity") in ("P0", "P1")]
@@ -222,6 +230,7 @@ def run_pipeline(state: dict) -> dict:
                 state["final_script"] = state.get("script")
                 state["grade"] = "normal"
                 state["step"] = "done"
+                logger.info(f"审核通过（{len(issues)} 个 P2 建议仅记录）→ done")
 
             elif state.get("revision_count", 0) >= MAX_REVISIONS:
                 # 改了 3 次还有问题 → 不再改了，降级输出
@@ -230,10 +239,12 @@ def run_pipeline(state: dict) -> dict:
                 state["needs_human"] = True
                 state["grade"] = "degraded"
                 state["step"] = "done"
+                logger.warning(f"降级输出 | {len(must_fix)} 个 P0/P1 未解决（已达 {MAX_REVISIONS} 轮上限）")
 
             else:
                 # 有问题且还有修改额度 → 进入修改步骤
                 state["step"] = "revise"
+                logger.info(f"审核不通过（{len(must_fix)} 个 P0/P1 需修改）→ revise（第 {state.get('revision_count', 0) + 1} 轮）")
 
             break   # 暂停
 
@@ -246,8 +257,13 @@ def run_pipeline(state: dict) -> dict:
             script_content = state.get("script", {}).get("content", "")
             if script_content:
                 compliance_result = run_compliance_check(script_content)
-                state["_compliance_issues"] = compliance_result.get("issues", [])
+                issues_found = compliance_result.get("issues", [])
+                state["_compliance_issues"] = issues_found
+                if issues_found:
+                    logger.warning(f"护栏② 修改后合规检测命中 {len(issues_found)} 条")
             state["step"] = "review"   # 改完回到审核，形成 review↔revise 循环
+            rc = state.get("revision_count", 0)
+            logger.info(f"step: revise → review（第 {rc} 轮修改完成）")
             break   # 暂停
 
         # ======== 未知步骤 → 兜底结束 ========

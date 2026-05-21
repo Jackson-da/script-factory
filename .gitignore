@@ -30,3 +30,6 @@ Thumbs.db
 langfuse_debug/
 
 script_factory.egg-info/
+
+# Logs
+logs/

@@ -4,7 +4,10 @@
 审核Agent在评分前调用此模块做硬性合规扫描。
 """
 
+import logging
 import re
+
+logger = logging.getLogger(__name__)
 
 
 # 广告法极限词 —— 正则匹配
@@ -125,8 +128,15 @@ def run_compliance_check(text: str) -> dict:
     all_issues.extend(detect_medical_claims(text))
     all_issues.extend(detect_political_sensitive(text))
 
+    passed = len(all_issues) == 0
+    if passed:
+        logger.debug("合规检测通过")
+    else:
+        categories = set(i.get("category", "unknown") for i in all_issues)
+        logger.info(f"合规检测命中 {len(all_issues)} 条 | 类别: {categories}")
+
     return {
-        "passed": len(all_issues) == 0,
+        "passed": passed,
         "issues": all_issues,
         "summary": f"检测到 {len(all_issues)} 个合规问题" if all_issues else "合规检测通过",
     }

@@ -22,10 +22,13 @@ BaseAgent 提供：
 """
 
 import json
+import logging
 import traceback
 from abc import ABC, abstractmethod
 from langchain_openai import ChatOpenAI
 from backend.app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -142,10 +145,10 @@ class BaseAgent(ABC):
             data = extract_json(raw)
             return schema(**data)
         except Exception:
-            # 解析失败 → 打印错误日志，返回 None
+            # 解析失败 → 记 warning 日志，返回 None
             # 各 Agent 的 run 函数收到 None 后会构造兜底对象
-            print(f"[{self.__class__.__name__}] JSON解析失败，使用兜底")
-            traceback.print_exc()
+            logger.warning(f"[{self.__class__.__name__}] JSON 解析失败，使用兜底")
+            logger.debug(traceback.format_exc())
             return None
 
     @abstractmethod
