@@ -11,11 +11,17 @@ FastAPI 依赖注入（Dependency Injection）模块。
   依赖注入：统一管理"怎么获取这个依赖"，路由函数只声明"我需要什么"
   好处：可复用、方便测试时可替换为 mock、路由函数与具体实现解耦。
 
-本模块只有一个依赖：get_pipeline。
-它返回编排器函数 run_pipeline，router 拿到后自己调用来驱动流水线。
+本模块包含：
+  get_pipeline: 返回编排器函数
+  limiter:      slowapi 限流器实例（main.py 和 router.py 共用）
 """
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from backend.app.pipeline.orchestator import run_pipeline
+
+# 创建限流器实例（基于客户端 IP 地址计数）
+limiter = Limiter(key_func=get_remote_address)
 
 
 def get_pipeline():

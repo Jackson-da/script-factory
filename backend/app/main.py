@@ -26,8 +26,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from backend.app.api.router import router
+from backend.app.api.deps import limiter
 from backend.app.core.logging import setup_logging
 from backend.app.core.config import get_settings
 from backend.app.tracker.langfuse import flush as langfuse_flush
@@ -92,7 +95,17 @@ app.add_middleware(
 )
 
 # ============================================================
-# 3. 注册 API 路由
+# 3. API 限流中间件
+# ============================================================
+# slowapi 基于客户端 IP 限制请求频率。
+# /generate 通过 @limiter.limit 装饰器控制（router.py 中），
+# 超限自动返回 429 Too Many Requests。
+# 注册 rate_limit_exceeded_handler 让超限响应格式统一。
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ============================================================
+# 4. 注册 API 路由
 # ============================================================
 # include_router 把 router.py 中定义的所有端点（/generate、/health 等）
 # 挂载到 app 上。
@@ -102,7 +115,7 @@ app.include_router(router)
 
 
 # ============================================================
-# 4. 健康检查端点
+# 5. 健康检查端点
 # ============================================================
 # /health 是基础设施接口，不涉及业务逻辑。
 # 用途：

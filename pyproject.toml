@@ -23,6 +23,7 @@ dependencies = [
     "tavily-python>=0.5.0",        # Tavily AI 搜索 API 客户端
     "langfuse>=2.50.0",            # LLM 可观测性与追踪平台（层4启用）
     "httpx>=0.27.0",               # 高性能 HTTP 客户端，用于外部 API 调用
+    "slowapi>=0.1.9",              # API 限流中间件，基于 IP 的请求频率限制
 ]
 
 [project.optional-dependencies]

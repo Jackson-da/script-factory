@@ -27,11 +27,11 @@ POST /generate 设计要点：
 """
 
 import logging
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import ValidationError
 from backend.app.schemas.request import GenerateRequest, ConfirmRequest
 from backend.app.schemas.response import GenerateResponse, StepInfo
-from backend.app.api.deps import get_pipeline
+from backend.app.api.deps import get_pipeline, limiter
 from backend.app.pipeline.orchestator import init_state
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,9 @@ def _state_to_response(state: dict) -> GenerateResponse:
 # 核心端点：POST /generate
 # ============================================================
 @router.post("/generate", response_model=GenerateResponse)
+@limiter.limit("10/minute")   # 同一 IP 每分钟最多 10 次生成请求
 async def generate_script(
+    request: Request,
     body: dict = Body(...),
     pipeline=Depends(get_pipeline),
 ):
