@@ -31,5 +31,8 @@ langfuse_debug/
 
 script_factory.egg-info/
 
+# Docs
+docs/
+
 # Logs
 logs/
