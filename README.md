@@ -110,8 +110,14 @@ npm --prefix frontend run dev
 ### 4. Docker 部署
 
 ```bash
-# 在项目根目录执行
+# 在项目根目录执行（Windows 遇 gRPC 报错先执行 export DOCKER_BUILDKIT=0）
 docker compose -f docker/docker-compose.yml up -d --build
+
+# 多容器扩展：启动 3 个后端实例，Nginx upstream 自动轮询负载均衡
+docker compose -f docker/docker-compose.yml up -d --scale backend=3
+
+# 停止
+docker compose -f docker/docker-compose.yml down
 ```
 
 部署后访问 `http://服务器IP`，Nginx 在 80 端口统一接收请求：
@@ -119,15 +125,22 @@ docker compose -f docker/docker-compose.yml up -d --build
 | 请求路径 | 处理方式 |
 |---------|---------|
 | `/` | Nginx 返回前端页面（Vue SPA） |
-| `/generate` | Nginx 转发到 backend:8000（AI 生成） |
-| `/health` | Nginx 转发到 backend:8000（健康检查） |
+| `/generate` | Nginx 转发到 upstream backends（负载均衡轮询） |
+| `/health` | Nginx 转发到 upstream backends |
 
 ```
 用户 → Nginx(:80) ──→ 前端静态文件
-                 └──→ backend(:8000)  [不暴露公网]
+                 └──→ upstream backends ──→ backend-1 (:8000)
+                                        ├──→ backend-2 (:8000)
+                                        └──→ backend-3 (:8000)
+                                        [均不暴露公网]
 ```
 
 **安全设计**：后端端口不对外暴露，Nginx 是唯一公网入口。日志挂载到宿主机 `logs/` 目录，容器重启不丢失。
+
+**负载均衡**：nginx.conf 中 `upstream backends` 声明后端名单，Docker DNS 自动解析 `backend` 为所有健康容器的内网 IP。Nginx 默认轮询分发请求。单容器时名单就一个，多容器时自动轮询，无需改配置。
+
+**Windows 已知问题**：Docker Desktop 的 BuildKit（新一代构建引擎）通过 gRPC 与守护进程通信，WSL2 网络偶发断开导致构建失败。临时解决：`export DOCKER_BUILDKIT=0` 切换旧引擎。永久解决：Docker Desktop Settings → Docker Engine → 添加 `"features": {"buildkit": false}`。
 
 ## 测试
 
@@ -208,7 +221,7 @@ python backend/evaluation/run_eval.py
 │   ├── docker-compose.yml       # 服务编排（backend + frontend）
 │   ├── Dockerfile.backend       # 后端镜像
 │   ├── Dockerfile.frontend      # 前端多阶段构建
-│   └── nginx.conf               # Nginx 反代 + SPA 路由
+│   └── nginx.conf               # Nginx 反代 + SPA 路由 + upstream 负载均衡
 ├── .dockerignore         # Docker 构建排除规则
 └── docs/                # 设计文档 + 实施计划
 ```

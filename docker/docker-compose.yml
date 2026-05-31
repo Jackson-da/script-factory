@@ -1,3 +1,5 @@
+name: script-factory    # 项目名，容器名统一前缀，多项目不会冲突
+
 services:
   # 后端 FastAPI 服务 —— 不暴露公网端口，只让 Nginx 通过内网访问
   backend:
