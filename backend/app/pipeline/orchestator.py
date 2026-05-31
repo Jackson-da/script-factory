@@ -41,63 +41,73 @@ logger = logging.getLogger(__name__)
 
 # 最大修改轮次 —— 超过此值即使有未解决问题也降级输出，避免死循环
 MAX_REVISIONS = 3
+# 最低通过分数 —— 即使没有 P0/P1 硬伤，总分低于此值也必须修改
+MIN_PASS_SCORE = 90
 
 
 # ============================================================
 # 辅助函数：构建步骤状态列表
 # ============================================================
 def _build_step_list(state: dict) -> list[dict]:
-    """生成前端 PipelineView 需要的步骤状态列表。
+    """根据 review_rounds 动态生成步骤列表，展示审核↔修改的完整历史。
 
-    根据 state["step"] 的当前值决定每个步骤的视觉状态：
-    - idle  → 灰色（还没轮到）
-    - active → 蓝色（正在执行）
-    - done   → 绿色（已完成）
+    不再固定四个步骤，而是：
+      plan → write → review_1 → (revise_1) → review_2 → (revise_2) → ...
 
-    特殊处理：
-    - step == "done"         → 所有步骤标记为 done
-    - step == "wait_confirm" → 只有策划标注为 done✓，其他 idle
-    - 其他标准步骤           → 前面的 done，当前的 active，后面的 idle
-
-    Args:
-        state: 流水线状态字典
-
-    Returns:
-        list[dict]: 四个步骤的状态列表，顺序：策划→写作→审核→修改
+    修改步骤只在"审核不通过且实际跑过修改"时才出现。
     """
     steps = [
         {"name": "plan",   "status": "idle", "label": "策划"},
         {"name": "write",  "status": "idle", "label": "写作"},
-        {"name": "review", "status": "idle", "label": "审核"},
-        {"name": "revise", "status": "idle", "label": "修改"},
     ]
     current = state.get("step", "plan")
+    review_rounds = state.get("review_rounds", [])
+    revision_count = state.get("revision_count", 0)
 
+    # ---- 已完成：所有步骤标 done ----
     if current == "done":
-        # 走到 done 时，策划/写作/审核都必然跑过，但修改不一定
-        # 只有当 revision_count > 0 时才把修改标为 done，否则保持 idle
-        steps[0]["status"] = "done"   # 策划：必定跑过
-        steps[1]["status"] = "done"   # 写作：必定跑过
-        steps[2]["status"] = "done"   # 审核：必定跑过（至少一次）
-        if state.get("revision_count", 0) > 0:
-            steps[3]["status"] = "done"    # 修改：确实跑过
-        else:
-            steps[3]["status"] = "skipped"  # 修改：不需要，跳过
+        steps[0]["status"] = "done"
+        steps[1]["status"] = "done"
+        for r in review_rounds:
+            steps.append({"name": f"review_{r['round']}", "status": "done", "label": f"审核{r['round']}"})
+            if r.get("revised_script"):
+                steps.append({"name": f"revise_{r['round']}", "status": "done", "label": f"修改{r['round']}"})
+        return steps
 
-    elif current == "wait_confirm":
-        # 策划完成但等人确认：策划绿 + 标注✓，其余灰
+    # ---- 等待确认：只有策划 done ----
+    if current == "wait_confirm":
         steps[0]["status"] = "done"
         steps[0]["label"] = "策划 ✓"
+        return steps
 
+    # ---- 进行中 ----
+    # plan / write 的状态根据当前 step 判断
+    if current == "plan":
+        steps[0]["status"] = "active"
+    elif current == "write":
+        steps[0]["status"] = "done"
+        steps[1]["status"] = "active"
     else:
-        # 标准步骤：遍历到当前步骤，前面的 done，当前 active，后面保持 idle
-        found = False
-        for s in steps:
-            if s["name"] == current:
-                s["status"] = "active"
-                found = True
-            elif not found:
-                s["status"] = "done"
+        # 已进入 review/revise 阶段，plan 和 write 必然已完成
+        steps[0]["status"] = "done"
+        steps[1]["status"] = "done"
+
+    for r in review_rounds:
+        round_num = r["round"]
+        is_last = (round_num == len(review_rounds))
+        steps.append({"name": f"review_{round_num}", "status": "done", "label": f"审核{round_num}"})
+        if r.get("revised_script"):
+            # 这轮改过了，如果紧接着是下一轮审核，标 done；否则 active
+            status = "active" if (is_last and current == "review") else "done"
+            steps.append({"name": f"revise_{round_num}", "status": status, "label": f"修改{round_num}"})
+        elif is_last and current == "revise":
+            # 刚审核完不通过，马上要修改
+            steps.append({"name": f"revise_{round_num}", "status": "active", "label": f"修改{round_num}"})
+
+    # 如果是 review 步骤且当前轮还不在 review_rounds 里（即将执行的新一轮审核）
+    if current == "review" and revision_count == len(review_rounds):
+        next_round = len(review_rounds) + 1
+        steps.append({"name": f"review_{next_round}", "status": "active", "label": f"审核{next_round}"})
 
     return steps
 
@@ -142,6 +152,7 @@ def run_pipeline(state: dict) -> dict:
             "revision": RevisionAgent(),
         }
         state["revision_count"] = state.get("revision_count", 0)
+        state.setdefault("review_rounds", [])  # 审核/修改轮次历史
         # 兜底：如果 step 不在已知列表中，强制从 plan 开始
         if state["step"] not in ("plan", "wait_confirm", "write", "review", "revise", "done"):
             state["step"] = "plan"
@@ -222,15 +233,52 @@ def run_pipeline(state: dict) -> dict:
                 state["review"] = review
                 logger.warning(f"护栏③ 审核阶段合并合规问题 {len(compliance_issues)} 条")
 
+            # 存一轮审核快照（给前端展示轮次历史）
+            round_num = len(state.setdefault("review_rounds", [])) + 1
+            state["review_rounds"].append({
+                "round": round_num,
+                "review": state.get("review"),
+                "revised_script": None,  # 还没改，修改完成后补上
+            })
+
             # 分离 P0/P1（必须改）和 P2（仅记录）
             must_fix = [i for i in issues if i.get("severity") in ("P0", "P1")]
+            score = review.get("score", 0)
+
+            # 分数过低但没有硬伤 → 从低分维度生成修改建议
+            if not must_fix and score < MIN_PASS_SCORE:
+                dims = review.get("dimension_scores", {})
+                # 找出低于 20 分的维度（满分 25），这些是拖后腿的
+                weak_dims = [
+                    f"{name}（{dims.get(key, 0)}/25）"
+                    for key, name in [
+                        ("information", "信息量不足"),
+                        ("oral", "不够口语化"),
+                        ("compliance", "合规性偏低"),
+                        ("usability", "可用率偏低"),
+                    ]
+                    if dims.get(key, 0) < 20
+                ]
+                if weak_dims:
+                    synthetic = {
+                        "severity": "P1",
+                        "category": "style",
+                        "location": "全文",
+                        "description": f"综合评分仅 {score} 分（最低通过线 {MIN_PASS_SCORE}），以下维度严重不足：{'；'.join(weak_dims)}",
+                        "suggestion": "请针对上述低分维度整体优化脚本，提升内容质量和表达效果",
+                    }
+                    must_fix.append(synthetic)
+                    issues.append(synthetic)
+                    review["issues"] = issues
+                    state["review"] = review
+                logger.info(f"总分 {score} < {MIN_PASS_SCORE}，从弱维度生成 {len(must_fix)} 条修改要求")
 
             if not must_fix:
                 # 没有要改的 → 通过，输出终稿
                 state["final_script"] = state.get("script")
                 state["grade"] = "normal"
                 state["step"] = "done"
-                logger.info(f"审核通过（{len(issues)} 个 P2 建议仅记录）→ done")
+                logger.info(f"审核通过（分数 {score}，{len(issues)} 个 P2 建议仅记录）→ done")
 
             elif state.get("revision_count", 0) >= MAX_REVISIONS:
                 # 改了 3 次还有问题 → 不再改了，降级输出
@@ -244,7 +292,7 @@ def run_pipeline(state: dict) -> dict:
             else:
                 # 有问题且还有修改额度 → 进入修改步骤
                 state["step"] = "revise"
-                logger.info(f"审核不通过（{len(must_fix)} 个 P0/P1 需修改）→ revise（第 {state.get('revision_count', 0) + 1} 轮）")
+                logger.info(f"审核不通过（{len(must_fix)} 个 P0/P1 需修改，分数 {score}）→ revise（第 {state.get('revision_count', 0) + 1} 轮）")
 
             break   # 暂停
 
@@ -252,6 +300,9 @@ def run_pipeline(state: dict) -> dict:
         elif step == "revise":
             state = agents["revision"].run(state)
             state["revision_count"] = state.get("revision_count", 0) + 1
+            # 把改完的脚本记到当前轮的 revised_script
+            if state.get("review_rounds"):
+                state["review_rounds"][-1]["revised_script"] = state.get("script")
             # 护栏 ②：修改完成后再次执行合规检测
             # 防止 LLM 修改时引入新的违规词（如 "最好"→"极致"）
             script_content = state.get("script", {}).get("content", "")
@@ -321,5 +372,7 @@ def init_state(
         "needs_human": False,        # 是否需要人工处理
         "grade": "normal",           # 最终等级
         "unresolved_issues": [],     # 未解决的问题列表
+        "review_rounds": [],         # 审核/修改轮次历史（前端展示用）
+        "hotspot": [],              # Tavily 搜索的热点信息 [{title, content, url}]
         "_elapsed": 0,               # 内部：累积耗时
     }

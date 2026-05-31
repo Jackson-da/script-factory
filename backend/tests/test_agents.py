@@ -55,7 +55,7 @@ class TestPlanningAgent:
             estimated_duration=120,
         )
         _mock_invoke(outline, agent)
-        agent._search_hotspot = MagicMock(return_value="")
+        agent._search_hotspot = MagicMock(return_value=[])
 
         result = agent.run(state)
         assert "outline" in result
@@ -70,7 +70,7 @@ class TestPlanningAgent:
             sections=[], key_phrases=[], estimated_duration=120,
         )
         _mock_invoke(outline, agent)
-        agent._search_hotspot = MagicMock(return_value="")
+        agent._search_hotspot = MagicMock(return_value=[])
 
         # 验证 _invoke 被调用（不崩即可，prompt 内容由 LLM 保证）
         result = agent.run(state)
@@ -79,7 +79,7 @@ class TestPlanningAgent:
     def test_run_fallback_on_parse_failure(self, agent, state):
         """_invoke 返回 None → 兜底 Outline 被写入 state。"""
         _mock_invoke(None, agent)
-        agent._search_hotspot = MagicMock(return_value="")
+        agent._search_hotspot = MagicMock(return_value=[])
 
         result = agent.run(state)
         assert result["outline"] is not None
@@ -93,7 +93,9 @@ class TestPlanningAgent:
             sections=[], key_phrases=[], estimated_duration=120,
         )
         _mock_invoke(outline, agent)
-        mock_search = MagicMock(return_value="热点内容参考")
+        mock_search = MagicMock(return_value=[
+            {"title": "热点标题", "content": "热点内容参考", "url": "https://example.com"},
+        ])
         agent._search_hotspot = mock_search
 
         agent.run(state)

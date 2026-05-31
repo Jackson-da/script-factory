@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     # 用于策划 Agent 搜热点话题、审核 Agent 做事实核查
     # 不需要搜索功能时可以不填
     tavily_api_key: str = ""
+    # 限定搜索域名（逗号分隔），只搜中文内容平台，为空则不限
+    tavily_include_domains: str = (
+        # 社交/视频
+        "weibo.com,douyin.com,bilibili.com,xiaohongshu.com,"
+        # 门户/新闻
+        "news.qq.com,thepaper.cn,ifeng.com,sohu.com,sina.com.cn,163.com,guancha.cn,"
+        # 科技/商业
+        "36kr.com,huxiu.com,ithome.com,"
+        # 问答/知识
+        "zhihu.com,baidu.com,csdn.net,juejin.cn,jianshu.com"
+    )
 
     # ---------- LangFuse 可观测性（层 4 启用）----------
     # LLM 调用追踪、性能监控、成本统计

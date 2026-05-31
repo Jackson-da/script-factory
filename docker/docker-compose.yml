@@ -1,11 +1,22 @@
-version: "3.8"
-
 services:
-  api:
+  # 后端 FastAPI 服务 —— 不暴露公网端口，只让 Nginx 通过内网访问
+  backend:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.api
-    ports:
-      - "8000:8000"
+      dockerfile: docker/Dockerfile.backend
     env_file:
       - ../.env
+    volumes:
+      - ../logs:/app/logs   # 日志持久化，容器重启不丢
+    restart: unless-stopped
+
+  # 前端 Nginx 服务 —— 唯一对外入口
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

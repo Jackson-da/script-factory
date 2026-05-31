@@ -92,10 +92,12 @@ def _state_to_response(state: dict) -> GenerateResponse:
         outline=state.get("outline"),
         script=state.get("script"),
         review=state.get("review"),
+        review_rounds=state.get("review_rounds", []),
         revision_count=state.get("revision_count", 0),
         grade=state.get("grade", "normal"),
         needs_human=state.get("needs_human", False),
         unresolved_issues=state.get("unresolved_issues", []),
+        hotspot=state.get("hotspot", []),
         elapsed_time=elapsed,
         state=serializable_state,
     )

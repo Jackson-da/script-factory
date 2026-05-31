@@ -95,8 +95,8 @@ class ReviewAgent(BaseAgent):
         fact_text = f"\n事实核查参考：\n{fact_check}" if fact_check else ""
 
         # 第 2 步：拼 system prompt
-        # 四个审核维度，每个 25 分，总分 100
-        system = f"""你是严格的短视频脚本审核编辑。审核4个维度，每维25分：
+        # 四个审核维度，每个 25 分，总分 100，保留一位小数
+        system = f"""你是严格的短视频脚本审核编辑。审核4个维度，每维25分（保留一位小数）：
 1.信息量 2.口语化 3.合规性(极限词/医疗断言) 4.可用率
 
 风格：{style}{fact_text}
@@ -106,7 +106,7 @@ passed=true表示没有P0和P1
 
 严格按JSON格式输出（不要输出其他内容）：
 ```json
-{{"passed":true,"issues":[{{"severity":"P0","category":"compliance","location":"原文片段","description":"问题描述","suggestion":"修改建议"}}],"score":85,"dimension_scores":{{"information":22,"oral":20,"compliance":25,"usability":18}},"checks":{{"compliance":true,"facts":true,"style":true}}}}
+{{"passed":true,"issues":[{{"severity":"P0","category":"compliance","location":"原文片段","description":"问题描述","suggestion":"修改建议"}}],"score":85.5,"dimension_scores":{{"information":22.0,"oral":20.5,"compliance":25.0,"usability":18.0}},"checks":{{"compliance":true,"facts":true,"style":true}}}}
 ```"""
 
         # 第 3 步：调 LLM → 解析 → 转 ReviewResult 对象

@@ -78,7 +78,7 @@ const formattedContent = computed(() => {
       <div class="meta-bar">
         <div class="meta-item">
           <div class="meta-label">审核评分</div>
-          <div class="meta-value" :class="review?.score >= 60 ? 'score-high' : 'score-low'">
+          <div class="meta-value" :class="review?.score >= 90 ? 'score-high' : 'score-low'">
             {{ review?.score ?? '—' }}
           </div>
         </div>

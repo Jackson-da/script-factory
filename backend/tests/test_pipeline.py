@@ -38,7 +38,8 @@ class TestInitState:
             "step", "topic", "style", "duration", "auto_mode",
             "confirm_action", "feedback", "outline", "script",
             "review", "revision_count", "final_script",
-            "needs_human", "grade", "unresolved_issues", "_elapsed",
+            "needs_human", "grade", "unresolved_issues",
+            "review_rounds", "_elapsed",
         ]
         for key in expected_keys:
             assert key in state, f"字段 {key} 缺失"
@@ -52,19 +53,35 @@ class TestBuildStepList:
 
     # ---------- done 状态 ----------
     def test_done_with_revision(self):
-        """done + revision_count>0 → 四个步骤全 done。"""
-        state = {"step": "done", "revision_count": 2}
+        """done + 有修改轮次 → 全 done，含 review_N 和 revise_N。"""
+        state = {
+            "step": "done",
+            "revision_count": 2,
+            "review_rounds": [
+                {"round": 1, "review": {}, "revised_script": {"content": "改后"}},
+                {"round": 2, "review": {}, "revised_script": {"content": "再改"}},
+                {"round": 3, "review": {}, "revised_script": None},
+            ],
+        }
         steps = _build_step_list(state)
         assert all(s["status"] == "done" for s in steps)
+        names = [s["name"] for s in steps]
+        assert names == ["plan", "write", "review_1", "revise_1", "review_2", "revise_2", "review_3"]
 
     def test_done_without_revision(self):
-        """done + revision_count=0 → 修改标为 skipped。"""
-        state = {"step": "done", "revision_count": 0}
+        """done + 审核一次通过 → 没有修改步骤。"""
+        state = {
+            "step": "done",
+            "review_rounds": [
+                {"round": 1, "review": {"passed": True}, "revised_script": None},
+            ],
+        }
         steps = _build_step_list(state)
         assert steps[0]["status"] == "done"   # 策划
         assert steps[1]["status"] == "done"   # 写作
-        assert steps[2]["status"] == "done"   # 审核
-        assert steps[3]["status"] == "skipped"  # 修改
+        assert steps[2]["name"] == "review_1"
+        assert steps[2]["status"] == "done"
+        assert len(steps) == 3  # 没有修改步骤
 
     # ---------- wait_confirm 状态 ----------
     def test_wait_confirm(self):
@@ -74,18 +91,14 @@ class TestBuildStepList:
         assert steps[0]["status"] == "done"
         assert "✓" in steps[0]["label"]
         assert steps[1]["status"] == "idle"
-        assert steps[2]["status"] == "idle"
-        assert steps[3]["status"] == "idle"
 
     # ---------- 标准中间步骤 ----------
     def test_plan_active(self):
-        """step=plan → 策划 active，其余 idle。"""
+        """step=plan → 策划 active，写作 idle。"""
         state = {"step": "plan"}
         steps = _build_step_list(state)
         assert steps[0]["status"] == "active"
         assert steps[1]["status"] == "idle"
-        assert steps[2]["status"] == "idle"
-        assert steps[3]["status"] == "idle"
 
     def test_write_active(self):
         """step=write → 策划 done，写作 active。"""
@@ -93,47 +106,71 @@ class TestBuildStepList:
         steps = _build_step_list(state)
         assert steps[0]["status"] == "done"
         assert steps[1]["status"] == "active"
-        assert steps[2]["status"] == "idle"
-        assert steps[3]["status"] == "idle"
 
-    def test_review_active(self):
-        """step=review → 策划+写作 done，审核 active。"""
-        state = {"step": "review"}
+    def test_review_active_first_round(self):
+        """step=review + 无 review_rounds → review_1 为 active。"""
+        state = {"step": "review", "revision_count": 0, "review_rounds": []}
         steps = _build_step_list(state)
         assert steps[0]["status"] == "done"
         assert steps[1]["status"] == "done"
+        assert steps[2]["name"] == "review_1"
         assert steps[2]["status"] == "active"
-        assert steps[3]["status"] == "idle"
+
+    def test_review_active_second_round(self):
+        """step=review + revision_count=1 → review_2 active，前一轮的 revise done。"""
+        state = {
+            "step": "review",
+            "revision_count": 1,
+            "review_rounds": [
+                {"round": 1, "review": {}, "revised_script": {"content": "改"}},
+            ],
+        }
+        steps = _build_step_list(state)
+        names = [s["name"] for s in steps]
+        assert names == ["plan", "write", "review_1", "revise_1", "review_2"]
+        assert steps[4]["status"] == "active"  # review_2
 
     def test_revise_active(self):
-        """step=revise → 前三个 done，修改 active。"""
-        state = {"step": "revise"}
+        """step=revise → review_1 done，revise_1 active。"""
+        state = {
+            "step": "revise",
+            "revision_count": 0,
+            "review_rounds": [
+                {"round": 1, "review": {}, "revised_script": None},
+            ],
+        }
         steps = _build_step_list(state)
+        names = [s["name"] for s in steps]
+        assert names == ["plan", "write", "review_1", "revise_1"]
         assert steps[0]["status"] == "done"
         assert steps[1]["status"] == "done"
-        assert steps[2]["status"] == "done"
-        assert steps[3]["status"] == "active"
+        assert steps[2]["status"] == "done"     # review_1
+        assert steps[3]["status"] == "active"    # revise_1
 
     # ---------- 返回结构 ----------
-    def test_step_list_length(self):
-        """始终返回 4 个步骤。"""
+    def test_step_list_base_length(self):
+        """没有 review_rounds 时只含 plan + write。"""
         steps = _build_step_list({"step": "plan"})
-        assert len(steps) == 4
+        assert len(steps) == 2
 
-    def test_step_names(self):
-        """步骤名固定为 plan/write/review/revise。"""
+    def test_step_names_start_with_fixed(self):
+        """前两个步骤名固定为 plan 和 write。"""
         steps = _build_step_list({"step": "plan"})
         names = [s["name"] for s in steps]
-        assert names == ["plan", "write", "review", "revise"]
+        assert names[:2] == ["plan", "write"]
 
     def test_step_labels(self):
-        """中文标签正确（done 状态不额外加 ✓）。"""
-        state = {"step": "done", "revision_count": 1}
+        """中文标签正确。"""
+        state = {
+            "step": "done",
+            "review_rounds": [
+                {"round": 1, "review": {"passed": True}, "revised_script": None},
+            ],
+        }
         steps = _build_step_list(state)
         assert steps[0]["label"] == "策划"
         assert steps[1]["label"] == "写作"
-        assert steps[2]["label"] == "审核"
-        assert steps[3]["label"] == "修改"
+        assert steps[2]["label"] == "审核1"
 
 
 # ============================================================
@@ -220,14 +257,14 @@ class TestRunPipelineMock:
 
     # ---------- review 分支逻辑 ----------
     def test_review_passed_goes_to_done(self):
-        """审核无 P0/P1 → done，final_script 就位。"""
+        """审核无 P0/P1 且分数 >= 90 → done，final_script 就位。"""
         state = self._make_mock_state(step="review", auto_mode=True)
         state["script"] = {"content": "测试脚本"}
         def mock_run(s):
             s["review"] = {
                 "passed": True,
                 "issues": [],  # 无 P0/P1
-                "score": 85,
+                "score": 93,
             }
             return s
         state["_agents"]["review"].run = mock_run
@@ -257,7 +294,7 @@ class TestRunPipelineMock:
         assert state["step"] == "revise"
 
     def test_review_p2_only_goes_to_done(self):
-        """审核只有 P2 风格建议 → done（P2 不阻塞）。"""
+        """审核只有 P2 风格建议且分数 ≥ 90 → done（P2 不阻塞）。"""
         state = self._make_mock_state(step="review", auto_mode=True)
         state["script"] = {"content": "测试脚本"}
         def mock_run(s):
@@ -266,13 +303,38 @@ class TestRunPipelineMock:
                 "issues": [
                     {"severity": "P2", "category": "style", "description": "开头可以更有力"},
                 ],
-                "score": 82,
+                "score": 92,
             }
             return s
         state["_agents"]["review"].run = mock_run
 
         state = run_pipeline(state)
         assert state["step"] == "done"
+
+    def test_review_low_score_no_issues_goes_to_revise(self):
+        """没有 P0/P1 但分数 < 90 → 从弱维度生成修改建议 → revise。"""
+        state = self._make_mock_state(step="review", auto_mode=True)
+        state["script"] = {"content": "测试脚本"}
+        def mock_run(s):
+            s["review"] = {
+                "passed": True,
+                "issues": [],
+                "score": 68,
+                "dimension_scores": {
+                    "information": 18.0,
+                    "oral": 12.5,
+                    "compliance": 22.0,
+                    "usability": 16.0,
+                },
+            }
+            return s
+        state["_agents"]["review"].run = mock_run
+
+        state = run_pipeline(state)
+        assert state["step"] == "revise"
+        # 应该从低分维度生成了修改建议（oral=12.5/usability=16.0/info=18.0 都 < 20）
+        assert len(state["review"]["issues"]) >= 1
+        assert state["review"]["issues"][0]["severity"] == "P1"
 
     def test_review_max_revisions_degraded(self):
         """超过 MAX_REVISIONS 还有 P0 → done + degraded。"""
@@ -323,7 +385,7 @@ class TestRunPipelineMock:
 
     # ---------- _steps 和 _elapsed ----------
     def test_run_pipeline_sets_steps(self):
-        """run_pipeline 后 _steps 字段非空。"""
+        """run_pipeline 后 _steps 字段非空，且包含 plan 和 write。"""
         state = self._make_mock_state(step="plan", auto_mode=True)
         def mock_run(s):
             s["outline"] = {"title": "大纲"}
@@ -332,7 +394,10 @@ class TestRunPipelineMock:
 
         state = run_pipeline(state)
         assert "_steps" in state
-        assert len(state["_steps"]) == 4
+        assert len(state["_steps"]) >= 2
+        names = [s["name"] for s in state["_steps"]]
+        assert "plan" in names
+        assert "write" in names
 
     def test_run_pipeline_sets_elapsed(self):
         """run_pipeline 后 _elapsed 大于 0。"""

@@ -37,37 +37,46 @@ class PlanningAgent(BaseAgent):
         # 指定用 deepseek-reasoner，推理能力强
         super().__init__(model_name=get_settings().deepseek_reasoner_model)
 
-    def _search_hotspot(self, topic: str) -> str:
+    def _search_hotspot(self, topic: str) -> list[dict]:
         """用 Tavily 搜索给定选题的热门话题。
 
-        搜索不会阻塞 —— API key 缺失或网络错误时静默返回空字符串。
-
-        Args:
-            topic: 选题关键词
-
-        Returns:
-            搜索结果的文本拼接，或空字符串
+        返回结构化列表，每条含 title/content/url，供 LLM prompt 和前端展示共用。
+        搜索失败静默返回空列表，不阻塞主流程。
         """
         settings = get_settings()
         if not settings.tavily_api_key:
-            return ""
+            return []
         try:
             from tavily import TavilyClient
             client = TavilyClient(api_key=settings.tavily_api_key)
+
+            # 解析限定域名（.env 中逗号分隔，为空时搜全球）
+            include_domains = None
+            if settings.tavily_include_domains:
+                include_domains = [d.strip() for d in settings.tavily_include_domains.split(",") if d.strip()]
+
             result = client.search(
-                query=f"{topic} 热门话题 短视频",
-                search_depth="basic",
-                max_results=3,
+                query=topic,                    # 直接搜选题，不加多余关键词
+                search_depth="advanced",        # 深度搜索，精度更高
+                topic="news",                   # 新闻/热点模式，结果更实时
+                time_range="week",              # 只取最近一周
+                max_results=5,
+                include_domains=include_domains,
             )
-            summaries = [r.get("content", "")[:300] for r in result.get("results", [])]
-            if summaries:
-                logger.debug(f"Tavily 搜索成功 | query={topic} | 结果数={len(summaries)}")
-            else:
-                logger.debug(f"Tavily 搜索无结果 | query={topic}")
-            return "\n".join(summaries) if summaries else ""
+            items = []
+            for r in result.get("results", []):
+                items.append({
+                    "title": r.get("title", ""),
+                    "content": r.get("content", ""),
+                    "url": r.get("url", ""),
+                    "score": r.get("score", 0),  # 相关性评分，前端可展示
+                })
+            if items:
+                logger.debug(f"Tavily 搜索成功 | query={topic} | 结果数={len(items)}")
+            return items
         except Exception as e:
             logger.warning(f"Tavily 搜索失败（降级跳过）| query={topic} | error={e}")
-            return ""   # 搜索失败不阻塞，继续正常的策划流程
+            return []
 
     @trace_agent("planning")
     def run(self, state: dict) -> dict:
@@ -91,9 +100,15 @@ class PlanningAgent(BaseAgent):
         duration = state.get("duration", 120)
         feedback = state.get("feedback", "")
 
-        # 第 1 步：搜热点（有 key 才生效）
-        hotspot = self._search_hotspot(topic)
-        hotspot_text = f"\n热点参考：\n{hotspot}" if hotspot else ""
+        # 第 1 步：搜热点（有 key 才生效），返回结构化列表 [{title, content, url}]
+        hotspot_items = self._search_hotspot(topic)
+
+        # 给 LLM 拼热点参考文本（带标题和来源）
+        hotspot_parts = []
+        for item in hotspot_items:
+            hotspot_parts.append(f"- [{item['title']}]({item['url']})\n  {item['content'][:300]}")
+        hotspot_text = "\n热点参考：\n" + "\n".join(hotspot_parts) if hotspot_parts else ""
+
         feedback_text = f"\n修改要求：{feedback}" if feedback else ""
 
         # 第 2 步：拼 system prompt
@@ -129,6 +144,7 @@ class PlanningAgent(BaseAgent):
                 estimated_duration=duration,
             )
 
-        # 第 5 步：写回 state
+        # 第 5 步：写回 state（含热点信息，结构化列表供前端展示）
         state["outline"] = outline.model_dump()
+        state["hotspot"] = hotspot_items  # list[dict]，非纯文本
         return state

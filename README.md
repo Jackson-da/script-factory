@@ -8,7 +8,7 @@
 
 - **多 Agent 协作** — 4 个 Agent 各司其职（策划/写作/审核/修改），审核不通过自动循环修改，最多 3 轮
 - **自研状态机替代 LangGraph** — 评估后认定线性流程不需要图编排，50 行 `while + dict` 搞定，少引入 15 个依赖
-- **双护栏机制** — 正则硬拦截（极限词/医疗断言/政治敏感 100% 命中率）+ LLM 语义审查，两条路径互补
+- **双护栏机制** — 正则硬拦截（极限词/医疗断言/政治敏感 100% 命中率）+ LLM 语义审查，审核评分 90 分通过阈值 + 各维度 ≥20 分保障
 - **全栈可运行** — FastAPI + Vue 3，前端实时展示流水线进度，节奏标记彩色高亮
 - **可观测** — LangFuse 全链路追踪 + logging 日志系统（控制台+文件双输出，按天轮转），16 处日志点全覆盖
 
@@ -63,7 +63,7 @@ POST /generate
 | 日志 | logging | 控制台(INFO+) + 文件(DEBUG+, 按天轮转保留7天)，`LOG_LEVEL` 环境变量控制 |
 | 可观测 | LangFuse | Agent 级耗时/token 追踪（无 Key 时退化为 logging 输出） |
 | 编排 | 自定义状态机 | `while + dict`，不用 LangGraph |
-| 部署 | Docker Compose | 单容器，API + 4 Agent 同进程 |
+| 部署 | Docker Compose | Nginx 反代统一入口，多容器协作（前端 Nginx + 后端 FastAPI） |
 
 ## 快速开始
 
@@ -107,11 +107,27 @@ npm --prefix frontend run dev
 
 **日志**：控制台显示 INFO 级别及以上，文件 `logs/app.log` 留存完整 DEBUG 记录。排查问题时设 `LOG_LEVEL=DEBUG` 查看完整调用链。
 
-### 4. Docker
+### 4. Docker 部署
 
 ```bash
-docker-compose -f docker/docker-compose.yml up -d
+# 在项目根目录执行
+docker compose -f docker/docker-compose.yml up -d --build
 ```
+
+部署后访问 `http://服务器IP`，Nginx 在 80 端口统一接收请求：
+
+| 请求路径 | 处理方式 |
+|---------|---------|
+| `/` | Nginx 返回前端页面（Vue SPA） |
+| `/generate` | Nginx 转发到 backend:8000（AI 生成） |
+| `/health` | Nginx 转发到 backend:8000（健康检查） |
+
+```
+用户 → Nginx(:80) ──→ 前端静态文件
+                 └──→ backend(:8000)  [不暴露公网]
+```
+
+**安全设计**：后端端口不对外暴露，Nginx 是唯一公网入口。日志挂载到宿主机 `logs/` 目录，容器重启不丢失。
 
 ## 测试
 
@@ -188,6 +204,11 @@ python backend/evaluation/run_eval.py
 ├── backend/tests/       # 97 个测试
 ├── backend/evaluation/  # 评估数据集 + 对比脚本
 ├── frontend/src/        # Vue 3 组件 + API 封装
-├── docker/              # Dockerfile + compose
+├── docker/              # Docker Compose 多容器部署
+│   ├── docker-compose.yml       # 服务编排（backend + frontend）
+│   ├── Dockerfile.backend       # 后端镜像
+│   ├── Dockerfile.frontend      # 前端多阶段构建
+│   └── nginx.conf               # Nginx 反代 + SPA 路由
+├── .dockerignore         # Docker 构建排除规则
 └── docs/                # 设计文档 + 实施计划
 ```

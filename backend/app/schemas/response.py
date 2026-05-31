@@ -58,6 +58,9 @@ class GenerateResponse(BaseModel):
     # review: 审核 Agent 产出的审核结果，含评分和问题列表
     review: dict | None = Field(default=None, description="审核结果")
 
+    # review_rounds: 审核/修改的完整轮次历史，含每轮审核结果和修改后脚本
+    review_rounds: list = Field(default_factory=list, description="审核/修改轮次历史")
+
     # revision_count: 修改轮次计数，最多 3 轮
     revision_count: int = Field(default=0, description="已修改次数")
 
@@ -71,6 +74,9 @@ class GenerateResponse(BaseModel):
 
     # unresolved_issues: 超过 MAX_REVISIONS 后仍未解决的 P0/P1 问题
     unresolved_issues: list = Field(default_factory=list, description="未解决的问题列表")
+
+    # hotspot: Tavily 搜索的热点参考信息（策划阶段展示用）
+    hotspot: list = Field(default_factory=list, description="策划阶段搜索的热点参考 [{title, content, url}]")
 
     # elapsed_time: 从本次调用开始的累积耗时（秒）
     elapsed_time: float = Field(default=0.0, description="已耗时(秒)")

@@ -21,11 +21,13 @@ const response = reactive({
   outline: null,
   script: null,
   review: null,
+  review_rounds: [],
   revision_count: 0,
   grade: 'normal',
   needs_human: false,
   unresolved_issues: [],
   elapsed_time: 0,
+  hotspot: [],
 })
 // 保存完整 state 用于确认/继续调用
 let currentState = null
@@ -92,8 +94,9 @@ function handleReset() {
   appState.value = 'idle'
   Object.assign(response, {
     step: 'plan', steps: [], outline: null, script: null, review: null,
+    review_rounds: [],
     revision_count: 0, grade: 'normal', needs_human: false,
-    unresolved_issues: [], elapsed_time: 0,
+    unresolved_issues: [], elapsed_time: 0, hotspot: [],
   })
   currentState = null
 }
@@ -118,36 +121,42 @@ async function updateResponse(data) {
 
 <template>
   <div class="app-container">
-    <header class="app-header">
-      <h1>口播脚本生成工厂</h1>
-      <p class="app-subtitle">MCN 多Agent协作 — 策划 · 写作 · 审核 · 修改</p>
-    </header>
-
     <div class="app-grid">
-      <InputForm
-        :disabled="appState === 'running'"
-        @generate="handleGenerate"
-        @confirm="handleConfirm"
-        @reset="handleReset"
-        :app-state="appState"
-        :outline="response.outline"
-      />
+      <div class="app-grid-inner">
+        <header class="app-header">
+          <h1>口播脚本生成工厂</h1>
+          <p class="app-subtitle">MCN 多Agent协作 — 策划 · 写作 · 审核 · 修改</p>
+        </header>
 
-      <PipelineView
-        :steps="response.steps"
-        :outline="response.outline"
-        :app-state="appState"
-      />
+        <InputForm
+          :disabled="appState === 'running'"
+          @generate="handleGenerate"
+          @confirm="handleConfirm"
+          @reset="handleReset"
+          :app-state="appState"
+          :outline="response.outline"
+        />
 
-      <ScriptOutput
-        :script="response.script"
-        :review="response.review"
-        :revision-count="response.revision_count"
-        :grade="response.grade"
-        :elapsed-time="response.elapsed_time"
-        :unresolved-issues="response.unresolved_issues"
-        :app-state="appState"
-      />
+        <PipelineView
+          :steps="response.steps"
+          :outline="response.outline"
+          :script="response.script"
+          :review="response.review"
+          :review-rounds="response.review_rounds"
+          :hotspot="response.hotspot"
+          :app-state="appState"
+        />
+
+        <ScriptOutput
+          :script="response.script"
+          :review="response.review"
+          :revision-count="response.revision_count"
+          :grade="response.grade"
+          :elapsed-time="response.elapsed_time"
+          :unresolved-issues="response.unresolved_issues"
+          :app-state="appState"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -180,13 +189,13 @@ body {
 }
 
 .app-container {
-  max-width: 960px;
-  margin: 0 auto;
+  max-width: none;
   padding: 40px 24px 80px;
 }
 
 .app-header {
-  margin-bottom: 40px;
+  grid-column: span 12;
+  margin-bottom: 16px;
 }
 .app-header h1 {
   font-size: 28px;
@@ -201,14 +210,23 @@ body {
 
 .app-grid {
   display: grid;
+  /* 左右各 1/4，中间 1/2 */
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 0;
+}
+
+.app-grid-inner {
+  grid-column: 2;
+  display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 24px;
   align-items: start;
 }
 
-/* 响应式：768px以下堆叠 */
+/* 响应式：768px 以下堆叠 */
 @media (max-width: 768px) {
   .app-container { padding: 20px 16px 60px; }
   .app-grid { grid-template-columns: 1fr; }
+  .app-grid-inner { grid-column: 1; grid-template-columns: 1fr; }
 }
 </style>
